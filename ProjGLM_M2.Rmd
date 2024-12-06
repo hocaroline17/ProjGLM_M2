@@ -67,6 +67,7 @@ NYCAccidents <-
 
 head(NYCAccidents)
 
+# 1=yes, 0=no
 NYCAccidents <- NYCAccidents %>% 
   mutate(Queens = ifelse(BOROUGH == "QUEENS", 1, 0),
          StatenLsland = ifelse(BOROUGH == "STATEN ISLAND", 1, 0),
@@ -74,6 +75,7 @@ NYCAccidents <- NYCAccidents %>%
          Bronx = ifelse(BOROUGH == "BRONX", 1, 0)
          )
 
+# 1=yes, 0=no
 NYCAccidents <- NYCAccidents %>% 
   mutate(Afternoon = ifelse(TIME.OF.DAY == "Afternoon", 1, 0),
          Evening = ifelse(TIME.OF.DAY == "Evening", 1, 0),
