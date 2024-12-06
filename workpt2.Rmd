@@ -1,0 +1,85 @@
+---
+title: "ProjGLM_M2"
+output: html_document
+date: "2024-12-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Front Matter
+
+```{r}
+#Add libraries if needed
+library(tidyverse)
+
+#Read in dataset
+NYCAccidents <- read.csv(file = "/Users/hocaroline/Downloads/NYC Accidents 2020.csv")
+```
+
+```{r}
+# Replace blank values with NA
+NYCAccidents[NYCAccidents == ""] <- NA
+
+# Select the columns related to vehicle types
+vehicle_columns <- grep("VEHICLE.TYPE.CODE", names(NYCAccidents), value = TRUE)
+
+# Count the non-NA values across these columns for each row
+NYCAccidents$NUM.CARS.INVOLVED <- rowSums(!is.na(NYCAccidents[, vehicle_columns]))
+
+# Create a new variable summing persons injured and killed
+NYCAccidents$PERSONS.AFFECTED <- NYCAccidents$NUMBER.OF.PERSONS.INJURED + NYCAccidents$NUMBER.OF.PERSONS.KILLED
+
+# Convert CRASH TIME to POSIXct for time manipulation
+NYCAccidents$CRASH.TIME <- as.POSIXct(NYCAccidents$CRASH.TIME, format = "%H:%M:%S", tz = "UTC")
+
+# Define a function to classify time into categories
+classify_time_of_day <- function(hour) {
+  if (hour >= 5 & hour <= 11) {
+    return("Morning")
+  } else if (hour >= 12 & hour <= 16) {
+    return("Afternoon")
+  } else if (hour >= 17 & hour <= 20) {
+    return("Evening")
+  } else {
+    return("Night")
+  }
+}
+
+# Apply the function to create a new column
+NYCAccidents <- NYCAccidents %>%
+  mutate(TIME.OF.DAY = sapply(format(CRASH.TIME, "%H"), function(x) classify_time_of_day(as.numeric(x))))
+
+# Select relevant columns
+NYCAccidents <- 
+  NYCAccidents %>%
+  select(TIME.OF.DAY, BOROUGH, PERSONS.AFFECTED, NUM.CARS.INVOLVED) %>%
+  na.omit() # Remove accidents missing BOROUGH
+
+head(NYCAccidents)
+```
+
+```{r}
+library(ggplot2)
+
+#Look into what time of day accidents occur the most
+ggplot(NYCAccidents) +
+ aes(x = TIME.OF.DAY) +
+ geom_bar(fill = "#4682B4") +
+ theme_minimal()
+
+#Look into which boroughs have the most accidents 
+ggplot(NYCAccidents) +
+ aes(x = BOROUGH) +
+ geom_bar(fill = "#4682B4") +
+ theme_minimal()
+
+#Look into the relationship between the number of cars involved and how many people were affected faceted by borough
+ggplot(NYCAccidents) +
+ aes(x = NUM.CARS.INVOLVED, y = PERSONS.AFFECTED) +
+ geom_point(shape = "circle", 
+ size = 1.5, colour = "#4682B4") +
+ theme_minimal() +
+ facet_wrap(vars(BOROUGH))
+```
