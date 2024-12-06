@@ -1,0 +1,42 @@
+---
+title: "ProjGLM_M2"
+output: html_document
+date: "2024-12-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Front Matter
+
+```{r}
+#Add libraries if needed
+library(tidyverse)
+
+#Read in dataset
+NYCAccidents <- read.csv(file = "/Users/hocaroline/Downloads/NYC Accidents 2020.csv")
+```
+
+```{r}
+# Replace blank values with NA
+NYCAccidents[NYCAccidents == ""] <- NA
+
+# Select the columns related to vehicle types
+vehicle_columns <- grep("VEHICLE.TYPE.CODE", names(NYCAccidents), value = TRUE)
+
+# Count the non-NA values across these columns for each row
+NYCAccidents$NUM.CARS.INVOLVED <- rowSums(!is.na(NYCAccidents[, vehicle_columns]))
+
+# Create a new variable summing persons injured and killed
+NYCAccidents$PERSONS.AFFECTED <- NYCAccidents$NUMBER.OF.PERSONS.INJURED + NYCAccidents$NUMBER.OF.PERSONS.KILLED
+
+# Select relevant columns
+NYCAccidents <- 
+  NYCAccidents %>%
+  select(CRASH.TIME, BOROUGH, PERSONS.AFFECTED, NUM.CARS.INVOLVED) %>%
+  na.omit() # Remove accidents missing BOROUGH
+
+head(NYCAccidents)
+```
+
