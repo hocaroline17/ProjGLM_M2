@@ -31,12 +31,6 @@ NYCAccidents$NUM.CARS.INVOLVED <- rowSums(!is.na(NYCAccidents[, vehicle_columns]
 # Create a new variable summing persons injured and killed
 NYCAccidents$PERSONS.AFFECTED <- NYCAccidents$NUMBER.OF.PERSONS.INJURED + NYCAccidents$NUMBER.OF.PERSONS.KILLED
 
-# Select relevant columns
-NYCAccidents <- 
-  NYCAccidents %>%
-  select(CRASH.TIME, BOROUGH, PERSONS.AFFECTED, NUM.CARS.INVOLVED) %>%
-  na.omit() # Remove accidents missing BOROUGH
-
 # Convert CRASH TIME to POSIXct for time manipulation
 NYCAccidents$CRASH.TIME <- as.POSIXct(NYCAccidents$CRASH.TIME, format = "%H:%M:%S", tz = "UTC")
 
@@ -56,6 +50,12 @@ classify_time_of_day <- function(hour) {
 # Apply the function to create a new column
 NYCAccidents <- NYCAccidents %>%
   mutate(TIME.OF.DAY = sapply(format(CRASH.TIME, "%H"), function(x) classify_time_of_day(as.numeric(x))))
+
+# Select relevant columns
+NYCAccidents <- 
+  NYCAccidents %>%
+  select(TIME.OF.DAY, BOROUGH, PERSONS.AFFECTED, NUM.CARS.INVOLVED) %>%
+  na.omit() # Remove accidents missing BOROUGH
 
 head(NYCAccidents)
 ```
