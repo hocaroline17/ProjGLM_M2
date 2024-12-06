@@ -31,10 +31,11 @@ NYCAccidents$NUM.CARS.INVOLVED <- rowSums(!is.na(NYCAccidents[, vehicle_columns]
 # Create a new variable summing persons injured and killed
 NYCAccidents$PERSONS.AFFECTED <- NYCAccidents$NUMBER.OF.PERSONS.INJURED + NYCAccidents$NUMBER.OF.PERSONS.KILLED
 
-# Convert CRASH TIME to POSIXct for time manipulation
+# Convert CRASH.TIME to POSIXct for time manipulation
 NYCAccidents$CRASH.TIME <- as.POSIXct(NYCAccidents$CRASH.TIME, format = "%H:%M:%S", tz = "UTC")
 
 # Define a function to classify time into categories
+# Categorical variable for time of day allows for better visualization
 classify_time_of_day <- function(hour) {
   if (hour >= 5 & hour <= 11) {
     return("Morning")
@@ -51,6 +52,12 @@ classify_time_of_day <- function(hour) {
 NYCAccidents <- NYCAccidents %>%
   mutate(TIME.OF.DAY = sapply(format(CRASH.TIME, "%H"), function(x) classify_time_of_day(as.numeric(x))))
 
+# Reorder TIME.OF.DAY column to have the correct levels
+NYCAccidents$TIME.OF.DAY <- factor(
+  NYCAccidents$TIME.OF.DAY,
+  levels = c("Morning", "Afternoon", "Evening", "Night")
+)
+
 # Select relevant columns
 NYCAccidents <- 
   NYCAccidents %>%
@@ -60,3 +67,19 @@ NYCAccidents <-
 head(NYCAccidents)
 ```
 
+```{r}
+# Bar plot for accidents by borough
+ggplot(NYCAccidents, aes(x = BOROUGH)) +
+  geom_bar() +
+  labs(title = "Accidents by Borough", x = "Borough", y = "Count of Accidents")
+
+# Bar plot for accidents by time of day
+ggplot(NYCAccidents, aes(x = TIME.OF.DAY)) +
+  geom_bar() +
+  labs(title = "Accidents by Time of Day", x = "Time of Day", y = "Count of Accidents")
+
+# Box plot for persons affected by time of day
+ggplot(NYCAccidents, aes(x = TIME.OF.DAY, y = PERSONS.AFFECTED)) +
+  geom_boxplot() +
+  labs(title = "Persons Affected by Time of Day", x = "Time of Day", y = "Number of Persons Affected") 
+```
