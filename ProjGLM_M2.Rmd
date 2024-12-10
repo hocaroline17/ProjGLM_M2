@@ -24,7 +24,7 @@ NYCAccidents <- read.csv(file = "/Users/hocaroline/Downloads/NYC Accidents 2020.
 NYCAccidents[NYCAccidents == ""] <- NA
 
 # Select the columns related to vehicle types
-vehicle_columns <- grep("VEHICLE.TYPE.CODE", names(NYCAccidents), value = TRUE)
+vehicle_columns <- grep("CONTRIBUTING.FACTOR.VEHICLE", names(NYCAccidents), value = TRUE)
 
 # Count the non-NA values across these columns for each row
 NYCAccidents$NUM.CARS.INVOLVED <- rowSums(!is.na(NYCAccidents[, vehicle_columns]))
@@ -63,6 +63,7 @@ NYCAccidents$TIME.OF.DAY <- factor(
 NYCAccidents <- 
   NYCAccidents %>%
   select(TIME.OF.DAY, BOROUGH, PERSONS.AFFECTED, NUM.CARS.INVOLVED) %>%
+  filter(NUM.CARS.INVOLVED > 0) %>%
   na.omit() # Remove accidents missing BOROUGH
 
 head(NYCAccidents)
@@ -198,41 +199,9 @@ $$\begin{align}
 \end{align}$$
 
 $$\begin{align}
-\log(\lambda) = &-1.60734 + 0.18655 \cdot (\text{NUM.CARS.INVOLVED}) + 0.02523 \cdot (\text{BOROUGHBROOKLYN})  \\
-&- 0.15522 \cdot (\text{BOROUGHMANHATTAN}) - 0.05488 \cdot (\text{BOROUGHQUEENS})  \\
-&+ 0.21251 \cdot (\text{BOROUGHSTATEN.ISLAND}) + 0.12673 \cdot (\text{TIME.OF.DAYAfternoon})  \\
-&+ 0.36632 \cdot (\text{TIME.OF.DAYEvening}) + 0.37034 \cdot (\text{TIME.OF.DAYNight})
+\log(\lambda) = &-1.51694 + 0.12363 \cdot (\text{NUM.CARS.INVOLVED}) + 0.03124 \cdot (\text{BOROUGHBROOKLYN})  \\
+&- 0.14917 \cdot (\text{BOROUGHMANHATTAN}) - 0.04798 \cdot (\text{BOROUGHQUEENS})  \\
+&+ 0.21441 \cdot (\text{BOROUGHSTATEN.ISLAND}) + 0.13234 \cdot (\text{TIME.OF.DAYAfternoon})  \\
+&+ 0.36802 \cdot (\text{TIME.OF.DAYEvening}) + 0.37914 \cdot (\text{TIME.OF.DAYNight})
 \end{align}$$
 
-```{r}
-#Find Test Statistic
-X2 <- sum(residuals(model4, type = "pearson")^2)
-X2
-
-#Find DF, df = n - p = 1500 - 3
-model4$df.residual
-
-#Find p-value
-1 - pchisq(X2, model4$df.residual)
-```
-
-```{r}
-phiHat <- X2/model4$df.residual
-phiHat
-```
-
-```{r}
-model4q <- glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH + TIME.OF.DAY, family = quasipoisson, data = NYCAccidents)
-```
-
-```{r}
-#Find Test Statistic
-X2 <- sum(residuals(model4q, type = "pearson")^2)
-X2
-
-#Find DF, df = n - p = 1500 - 3
-model4q$df.residual
-
-#Find p-value
-1 - pchisq(X2, model4q$df.residual)
-```
