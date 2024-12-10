@@ -109,3 +109,73 @@ ggplot(NYCAccidents) +
  facet_wrap(vars(BOROUGH))
 ```
 
+```
+# Examining distribution by number of cars involved
+ggplot(data = NYCAccidents, aes(x = PERSONS.AFFECTED)) +
+  geom_histogram() +
+  facet_wrap(~ NUM.CARS.INVOLVED) 
+```
+
+```{r}
+# Mean = Variance
+table1 <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED)  %>% 
+  summarise(mnNum= mean(PERSONS.AFFECTED),varNum=var(PERSONS.AFFECTED),n=n())
+kable(table1, booktabs=T, 
+      caption="Compare mean and variance of persons affected size within each group separated by number of cars involved",
+      col.names = c("Cars Involved", "Mean", "Variance", "n")) %>%
+  kable_styling(full_width = F)
+```
+
+```{r}
+## Checking linearity assumption: Empirical log of the means plot
+sumStats <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED) %>% 
+  summarise(mnNum = mean(PERSONS.AFFECTED),
+            logmnNum = log(mnNum), n=n())
+ggplot(sumStats, aes(x=NUM.CARS.INVOLVED, y=logmnNum)) +
+  geom_point()+
+  geom_smooth(method = "loess")+
+  xlab("Number of cars involved") +
+  ylab("Log empirical mean persons affected") 
+```
+
+```{r}
+sumStats2 <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED, BOROUGH) %>% 
+  summarise(mnNum = mean(PERSONS.AFFECTED),
+            logmnNum = log(mnNum), n=n())
+ggplot(sumStats2, aes(x=NUM.CARS.INVOLVED, y=logmnNum, color=BOROUGH,
+                      linetype = BOROUGH, shape = BOROUGH)) +
+  geom_point()+
+  geom_smooth(method = "loess", se=FALSE)+
+  xlab("Number of cars involved") +
+  ylab("Log empirical mean persons affected") 
+```
+
+```{r}
+sumStats2 <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED, TIME.OF.DAY) %>% 
+  summarise(mnNum = mean(PERSONS.AFFECTED),
+            logmnNum = log(mnNum), n=n())
+ggplot(sumStats2, aes(x=NUM.CARS.INVOLVED, y=logmnNum, color=TIME.OF.DAY,
+                      linetype = TIME.OF.DAY, shape = TIME.OF.DAY)) +
+  geom_point()+
+  geom_smooth(method = "loess", se=FALSE)+
+  xlab("Number of cars involved") +
+  ylab("Log empirical mean persons affected") 
+```
+
+```{r}
+model1 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED, family = poisson, data = NYCAccidents)
+
+model2 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH, family = poisson, data = NYCAccidents)
+
+model3 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + TIME.OF.DAY, family = poisson, data = NYCAccidents)
+
+model4 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH + TIME.OF.DAY, family = poisson, data = NYCAccidents)
+```
+
+```{r}
+anova(model1, model2, test = "Chisq")
+anova(model1, model3, test = "Chisq")
+anova(model1, model4, test = "Chisq")
+anova(model2, model4, test = "Chisq")
+anova(model3, model4, test = "Chisq")
+```
