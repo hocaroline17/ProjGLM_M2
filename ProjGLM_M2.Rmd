@@ -118,7 +118,7 @@ ggplot(NYCAccidents) +
 
 ```{r}
 ggplot(data = NYCAccidents, aes(x = PERSONS.AFFECTED)) +
-  geom_histogram() +
+  geom_histogram() + theme_minimal() +
   facet_wrap(~ NUM.CARS.INVOLVED) 
 ```
 
@@ -139,7 +139,7 @@ sumStats <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED) %>%
             logmnNum = log(mnNum), n=n())
 ggplot(sumStats, aes(x=NUM.CARS.INVOLVED, y=logmnNum)) +
   geom_point()+
-  geom_smooth(method = "loess")+
+  geom_smooth(method = "loess")+ theme_minimal() +
   xlab("Number of cars involved") +
   ylab("Log empirical mean persons affected") 
 ```
@@ -186,3 +186,53 @@ anova(model2, model4, test = "Chisq")
 anova(model3, model4, test = "Chisq")
 ```
 
+```{r}
+summary(model4)
+```
+
+$$\begin{align}
+\log(\lambda) = &\beta_0 + \beta_1 (\text{NUM.CARS.INVOLVED}) + \beta_2 (\text{BOROUGHBROOKLYN}) + \\ 
+&\beta_3 (\text{BOROUGHMANHATTAN}) + \beta_4 (\text{BOROUGHQUEENS}) + \\
+&\beta_5 (\text{BOROUGHSTATEN.ISLAND}) + \beta_6 (\text{TIME.OF.DAYAfternoon}) + \\
+&\beta_7 (\text{TIME.OF.DAYEvening}) + \beta_8 (\text{TIME.OF.DAYNight})
+\end{align}$$
+
+$$\begin{align}
+\log(\lambda) = &-1.60734 + 0.18655 \cdot (\text{NUM.CARS.INVOLVED}) + 0.02523 \cdot (\text{BOROUGHBROOKLYN})  \\
+&- 0.15522 \cdot (\text{BOROUGHMANHATTAN}) - 0.05488 \cdot (\text{BOROUGHQUEENS})  \\
+&+ 0.21251 \cdot (\text{BOROUGHSTATEN.ISLAND}) + 0.12673 \cdot (\text{TIME.OF.DAYAfternoon})  \\
+&+ 0.36632 \cdot (\text{TIME.OF.DAYEvening}) + 0.37034 \cdot (\text{TIME.OF.DAYNight})
+\end{align}$$
+
+```{r}
+#Find Test Statistic
+X2 <- sum(residuals(model4, type = "pearson")^2)
+X2
+
+#Find DF, df = n - p = 1500 - 3
+model4$df.residual
+
+#Find p-value
+1 - pchisq(X2, model4$df.residual)
+```
+
+```{r}
+phiHat <- X2/model4$df.residual
+phiHat
+```
+
+```{r}
+model4q <- glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH + TIME.OF.DAY, family = quasipoisson, data = NYCAccidents)
+```
+
+```{r}
+#Find Test Statistic
+X2 <- sum(residuals(model4q, type = "pearson")^2)
+X2
+
+#Find DF, df = n - p = 1500 - 3
+model4q$df.residual
+
+#Find p-value
+1 - pchisq(X2, model4q$df.residual)
+```
