@@ -1,0 +1,159 @@
+---
+title: "ProjGLM_M2"
+output: html_document
+date: "2024-12-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Front Matter
+
+```{r}
+#Add libraries if needed
+library(tidyverse)
+library(ggplot2)
+
+#Read in dataset
+NYCAccidents <- read.csv(file = "/Users/hocaroline/Downloads/NYC Accidents 2020.csv")
+```
+
+```{r}
+# Replace blank values with NA
+NYCAccidents[NYCAccidents == ""] <- NA
+
+# Select the columns related to vehicle types
+vehicle_columns <- grep("CONTRIBUTING.FACTOR.VEHICLE", names(NYCAccidents), value = TRUE)
+
+# Count the non-NA values across these columns for each row
+NYCAccidents$NUM.CARS.INVOLVED <- rowSums(!is.na(NYCAccidents[, vehicle_columns]))
+
+# Create a new variable summing persons injured and killed
+NYCAccidents$PERSONS.AFFECTED <- NYCAccidents$NUMBER.OF.PERSONS.INJURED + NYCAccidents$NUMBER.OF.PERSONS.KILLED
+
+# Convert CRASH.TIME to POSIXct for time manipulation
+NYCAccidents$CRASH.TIME <- as.POSIXct(NYCAccidents$CRASH.TIME, format = "%H:%M:%S", tz = "UTC")
+
+# Define a function to classify time into categories
+# Categorical variable for time of day allows for better visualization
+classify_time_of_day <- function(hour) {
+  if (hour >= 5 & hour <= 11) {
+    return("Morning")
+  } else if (hour >= 12 & hour <= 16) {
+    return("Afternoon")
+  } else if (hour >= 17 & hour <= 20) {
+    return("Evening")
+  } else {
+    return("Night")
+  }
+}
+
+# Apply the function to create a new column
+NYCAccidents <- NYCAccidents %>%
+  mutate(TIME.OF.DAY = sapply(format(CRASH.TIME, "%H"), function(x) classify_time_of_day(as.numeric(x))))
+
+# Reorder TIME.OF.DAY column to have the correct levels
+NYCAccidents$TIME.OF.DAY <- factor(
+  NYCAccidents$TIME.OF.DAY,
+  levels = c("Morning", "Afternoon", "Evening", "Night")
+)
+
+# Select relevant columns
+NYCAccidents <- 
+  NYCAccidents %>%
+  select(TIME.OF.DAY, BOROUGH, PERSONS.AFFECTED, NUM.CARS.INVOLVED) %>%
+  filter(NUM.CARS.INVOLVED > 0) %>%
+  na.omit() # Remove accidents missing BOROUGH
+
+head(NYCAccidents)
+```
+
+```{r}
+# Bar plot for accidents by borough
+ggplot(NYCAccidents, aes(x = BOROUGH)) +
+  geom_bar() + theme_minimal() +
+  labs(title = "Accidents by Borough", x = "Borough", y = "Count of Accidents")
+
+# Bar plot for accidents by time of day
+ggplot(NYCAccidents, aes(x = TIME.OF.DAY)) +
+  geom_bar() + theme_minimal() +
+  labs(title = "Accidents by Time of Day", x = "Time of Day", y = "Count of Accidents")
+
+# Look into the relationship between the number of cars involved and how many people were affected faceted by borough
+ggplot(NYCAccidents) +
+ aes(x = NUM.CARS.INVOLVED, y = PERSONS.AFFECTED) +
+ geom_point() + theme_minimal() +
+ facet_wrap(vars(BOROUGH))
+
+# Look into the relationship between the number of cars involved and how many people were affected faceted by time of day
+ggplot(NYCAccidents) +
+ aes(x = NUM.CARS.INVOLVED, y = PERSONS.AFFECTED) +
+ geom_point() + theme_minimal() +
+ facet_wrap(vars(TIME.OF.DAY))
+```
+
+```{r}
+ggplot(data = NYCAccidents, aes(x = PERSONS.AFFECTED)) +
+  geom_histogram() + theme_minimal() +
+  facet_wrap(~ NUM.CARS.INVOLVED) 
+```
+
+```{r}
+# Mean = Variance
+table1 <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED)  %>% 
+  summarise(mnNum= mean(PERSONS.AFFECTED),varNum=var(PERSONS.AFFECTED),n=n())
+kable(table1, booktabs=T, 
+      caption="Compare mean and variance of persons affected size within each group separated by number of cars involved",
+      col.names = c("Cars Involved", "Mean", "Variance", "n")) %>%
+  kable_styling(full_width = F)
+```
+
+```{r}
+## Checking linearity assumption: Empirical log of the means plot
+sumStats <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED) %>% 
+  summarise(mnNum = mean(PERSONS.AFFECTED),
+            logmnNum = log(mnNum), n=n())
+ggplot(sumStats, aes(x=NUM.CARS.INVOLVED, y=logmnNum)) +
+  geom_point()+
+  geom_smooth(method = "loess")+ theme_minimal() +
+  xlab("Number of cars involved") +
+  ylab("Log empirical mean persons affected") 
+```
+
+```{r}
+model1 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED, family = poisson, data = NYCAccidents)
+
+model2 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH, family = poisson, data = NYCAccidents)
+
+model3 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + TIME.OF.DAY, family = poisson, data = NYCAccidents)
+
+model4 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH + TIME.OF.DAY, family = poisson, data = NYCAccidents)
+```
+
+```{r}
+anova(model1, model2, test = "Chisq")
+anova(model1, model3, test = "Chisq")
+anova(model1, model4, test = "Chisq")
+anova(model2, model4, test = "Chisq")
+anova(model3, model4, test = "Chisq")
+```
+
+```{r}
+summary(model4)
+```
+
+$$\begin{align}
+\log(\lambda) = &\beta_0 + \beta_1 (\text{NUM.CARS.INVOLVED}) + \beta_2 (\text{BOROUGHBROOKLYN}) + \\ 
+&\beta_3 (\text{BOROUGHMANHATTAN}) + \beta_4 (\text{BOROUGHQUEENS}) + \\
+&\beta_5 (\text{BOROUGHSTATEN.ISLAND}) + \beta_6 (\text{TIME.OF.DAYAfternoon}) + \\
+&\beta_7 (\text{TIME.OF.DAYEvening}) + \beta_8 (\text{TIME.OF.DAYNight})
+\end{align}$$
+
+$$\begin{align}
+\log(\lambda) = &-1.51694 + 0.12363 \cdot (\text{NUM.CARS.INVOLVED}) + 0.03124 \cdot (\text{BOROUGHBROOKLYN})  \\
+&- 0.14917 \cdot (\text{BOROUGHMANHATTAN}) - 0.04798 \cdot (\text{BOROUGHQUEENS})  \\
+&+ 0.21441 \cdot (\text{BOROUGHSTATEN.ISLAND}) + 0.13234 \cdot (\text{TIME.OF.DAYAfternoon})  \\
+&+ 0.36802 \cdot (\text{TIME.OF.DAYEvening}) + 0.37914 \cdot (\text{TIME.OF.DAYNight})
+\end{align}$$
+
