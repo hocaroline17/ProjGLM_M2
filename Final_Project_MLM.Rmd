@@ -1,0 +1,216 @@
+---
+title: "Final_Project_MLM"
+output: html_document
+date: "2024-12-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Front Matter
+
+```{r}
+# Add libraries if needed
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(lme4)
+
+# Read in dataset
+TestScores <- read.csv(file = "/Users/hocaroline/Downloads/test_scores.csv")
+```
+
+```{r}
+# Select relevant columns
+TestScores <- 
+  TestScores %>%
+  select(teaching_method, lunch, posttest, classroom)
+
+head(TestScores)
+```
+
+```{r}
+#Find mean and standard deviation
+TestScores %>%
+  summarize(overallmean = mean(posttest, na.rm = TRUE),
+            overallsd = sd(posttest, na.rm = TRUE))
+
+posttest_all <- ggplot(data = TestScores, mapping = aes(x = posttest)) +
+  geom_histogram(binwidth = 2, fill = "white", color = "black") +
+  labs(x = "Posttest Scores",
+       y = "Number of Students") 
+posttest_all
+```
+
+```{r}
+#Find the mean and standard deviation for each id and pass the means to ggplot
+posttest_agg <- TestScores %>%
+  group_by(classroom) %>%
+  summarize(mean_score = mean(posttest, na.rm = TRUE),
+            sd_score = sd(posttest, na.rm = TRUE)) %>%
+  ggplot(mapping = aes(x = mean_score)) +
+     geom_histogram(binwidth = 2, fill = "white", color = "black") +
+     labs(x = "Mean Posttest Score",
+          y = "Number of Classrooms") 
+posttest_agg
+```
+
+```{r}
+grid.arrange(posttest_all,posttest_agg,ncol=1)
+```
+
+```{r}
+# Find the counts of each lunch type
+table(TestScores$lunch)
+#Find the proportion for each lunch type
+prop.table(table(TestScores$lunch))
+
+ggplot(data = TestScores, mapping = aes(x = lunch)) + 
+  geom_bar(fill = "white", color = "black") +
+  labs(x = "Lunch Type",
+       y = "Frequency")
+```
+
+```{r}
+#Since the level 2 variables take the same value for each row of each classroom, keep the first row associated with each classroom
+TestScoresLev2 <- 
+  TestScores %>%
+  group_by(classroom) %>%
+  filter(row_number() == 1) 
+
+table(TestScoresLev2$teaching_method)
+prop.table(table(TestScoresLev2$teaching_method))
+
+ggplot(data = TestScoresLev2, mapping = aes(x = teaching_method)) + 
+  geom_bar(fill = "white", color = "black") +
+  labs(x = "Teaching Method",
+       y = "Frequency")
+```
+
+```{r}
+ggplot(data = TestScores, mapping = aes(y = lunch, x = posttest)) +
+  geom_boxplot() +
+  labs(y = "Lunch Type",
+       x = "Posttest Scores")
+```
+
+```{r}
+# Lattice plot for Posttest Scores vs. Lunch Type
+ggplot(TestScores,aes(x=factor(lunch),y=posttest)) +  
+  geom_dotplot(binaxis="y",stackdir="center",binwidth=25/30) + 
+  facet_wrap(~classroom,ncol=10) +   
+  theme(strip.text.x=element_blank()) + coord_flip() +
+  labs(x="Lunch Type",y="Posttest Score")
+```
+
+```{r}
+posttest_TM <-
+  ggplot(data = TestScores, mapping = aes(x = posttest, y = teaching_method)) +
+  geom_boxplot() +
+  labs(x = "Posttest Scores",
+       y = "Teaching Method") 
+posttest_TM
+```
+
+
+```{r}
+posttest_mean_TM <-
+  TestScores %>%
+  group_by(classroom) %>%
+  summarize(mean_posttest = mean(posttest, na.rm = T),
+            teaching_method = teaching_method) %>%
+  ggplot(mapping = aes(x = mean_posttest, y = teaching_method)) +
+  geom_boxplot() +
+  labs(x = "Mean Posttest Score",
+       y = "Teaching Method") 
+
+grid.arrange(posttest_TM, posttest_mean_TM, ncol = 1)
+```
+
+```{r}
+TestScores <-
+  TestScores %>%
+  mutate(free = ifelse(lunch=="Qualifies for reduced/free lunch",1,0),
+         standard = ifelse(teaching_method=="Standard",1,0))
+```
+
+
+### Model with no covariates (random intercepts model)
+
+multilevel model
+
+$$\text{LV1: } y_{ij} = a_i + \epsilon_{ij}$$
+
+$$\text{LV2: } a_i = \alpha_0 + u_i$$
+
+composite model
+
+$$y_{ij} = \alpha_0 + u_i + \epsilon_{ij}$$
+
+```{r}
+model1 <- lmer(posttest ~ 1 + (1 | classroom), REML = FALSE, data = TestScores)
+summary(model1)
+```
+
+$\hat\alpha_0 = 68.410$ This represents the average posttest score across all students and all classrooms. 
+
+$\hat\sigma^2 = 10.38$ This is the $\epsilon_{ij}$ variance. It represents the estimated variance of within classroom deviations. 
+
+$\hat\sigma^2_u = 183.35$ This is the $u_i$ variance. It represents the estimated variance of between classroom deviations. 
+
+$$\hat{p} = \frac{\hat\sigma^2_u}{\hat\sigma^2_u+\hat\sigma^2} = \frac{183.35}{193.73} = 0.946$$
+
+94.6% of the total variation in posttest scores is due to differences between classrooms. 
+
+0.946 is the average correlation for any pair of students within the same classroom. 
+
+### Level One Model
+
+multilevel model
+
+$$\text{LV1: } y_{ij} = a_i + b_ix_{ij,free} + \epsilon_{ij}$$
+
+$$\begin{align}
+\text{LV2: } &a_i = \alpha_0 + u_i \\
+&b_i = \beta_0 + v_i
+\end{align}$$
+
+composite model
+
+$$y_{ij} = \alpha_0 + u_i + \beta_0x_{ij,free} + v_ix_{ij,free} + \epsilon_{ij}$$
+
+```{r}
+model2 <- lmer(posttest ~  free + (1 + free | classroom), REML = FALSE, data = TestScores)
+summary(model2)
+```
+
+$|t| > 2$
+
+We expect posttest scores to decrease by 3.39, on average, for students that qualify for free or subsidized lunches as compared to students that do not qualify. 
+
+### Level Two Model
+
+multilevel model 
+
+$$\text{LV1: } y_{ij} = a_i + b_ix_{ij,free} + \epsilon_{ij}$$
+
+$$\begin{align}
+\text{LV2: } &a_i = \alpha_0 + \alpha_1x_{i,standard} + u_i \\
+&b_i = \beta_0 + \beta_1x_{i,standard} + v_i
+\end{align}$$
+
+composite model
+
+$$y_{ij} = \alpha_0 + \alpha_1x_{i,standard} + u_i + \beta_0x_{ij,free} + \beta_1x_{i,standard}x_{ij,free} + v_ix_{ij,free} + \epsilon_{ij}$$
+
+```{r}
+model3 <- lmer(posttest ~  free + standard + free:standard + (1 + free | classroom), REML = FALSE, data = TestScores)
+summary(model3)
+```
+
+```{r}
+anova(model1, model2, test = "Chisq")
+anova(model1, model3, test = "Chisq")
+anova(model2, model3, test = "Chisq")
+```
