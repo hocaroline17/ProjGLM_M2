@@ -1,0 +1,373 @@
+---
+title: "ProjMLM"
+output: html_document
+date: "2024-12-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Front Matter
+```{r, message=F, warning=F}
+# Add libraries
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(kableExtra)
+library(knitr)
+library(lme4)
+
+# Read in dataset
+TestScores <- read.csv("./Data/test_scores.csv")
+```
+## Research Question
+What is the association between whether a student qualifies for free/subsidized lunch and the
+post-test score of a student and does that association differ based on which teaching method a
+teacher uses?
+
+## Data Cleaning
+```{r}
+# Select interested level 1 and level 2 variables, response, and random effect 
+TestScores <- 
+  TestScores %>%
+  select(teaching_method, lunch, posttest, classroom)
+
+head(TestScores)
+```
+
+## EDA - univariate
+### Response variable (Posttest Score)
+```{r}
+#Find mean and standard deviation of the posttest scores 
+Posttest_Score <- TestScores %>%
+  summarize(overallmean = mean(posttest, na.rm = TRUE),
+            overallsd = sd(posttest, na.rm = TRUE))
+kable(Posttest_Score, format = "markdown", col.names = c("Overall Mean", "Overall Standard Deviation"), align = c("c", "c"))
+
+# Histogram that describes the distribution of posttest scores for individual student
+posttest_all <- ggplot(data = TestScores, mapping = aes(x = posttest)) +
+  geom_histogram(binwidth = 2, fill = "white", color = "black") +
+  labs(title = "Distribution of Posttest Scores for Individual Students", 
+       x = "Posttest Scores",
+       y = "Number of Students") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5))
+```
+
+```{r}
+#Find the mean and standard deviation for each type of classroom and form a histogram that represent the distribution of the mean posttest scores for different types of classrooms
+posttest_agg <- TestScores %>%
+  group_by(classroom) %>%
+  summarize(mean_score = mean(posttest, na.rm = TRUE),
+            sd_score = sd(posttest, na.rm = TRUE)) %>%
+  ggplot(mapping = aes(x = mean_score)) +
+     geom_histogram(binwidth = 2, fill = "white", color = "black") +
+     labs(title = "Distribution of Mean Posttest Scores for Classrooms", 
+          x = "Mean Posttest Scores",
+          y = "Number of Classrooms") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5))
+```
+
+```{r}
+grid.arrange(posttest_all, posttest_agg, ncol = 1)
+```
+  
+### Level one categorical variable (Lunch)
+```{r}
+# Find the counts of students for each lunch type
+lunch_count <- table(TestScores$lunch)
+kable(lunch_count, format = "markdown", col.names = c("Lunch Type", "Count"), align = c("c", "c"))
+
+#Find the proportion of students for each lunch type
+lunch_prop <- prop.table(table(TestScores$lunch))
+kable(lunch_prop, format = "markdown", col.names = c("Lunch Type", "Proportion"), align = c("c", "c"))
+
+#Use bar graph to compare the number of students who does or does not qualify for reduced/free lunch 
+ggplot(data = TestScores, mapping = aes(x = lunch)) + 
+  geom_bar(fill = "white", color = "black", width = 0.5) +
+  labs(x = "Lunch Type",
+       y = "Frequency",
+       title = "Number of Students for Each Lunch Type") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5),
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
+```
+
+### Level two categorical variable (Teaching Method)
+```{r}
+#Since the level 2 variables take the same value for each row of each classroom, keep the first row associated with each classroom
+TestScoresLev2 <- 
+  TestScores %>%
+  group_by(classroom) %>%
+  filter(row_number() == 1) 
+
+#Find the count of classroom for each teaching method
+TM_count <- table(TestScoresLev2$teaching_method)
+kable(TM_count, format = "markdown", col.names = c("Teaching Method", "Count"), align = c("c", "c"))
+
+#Find the proportion of classroom for each teaching method
+TM_prop <- prop.table(table(TestScoresLev2$teaching_method))
+kable(TM_prop, format = "markdown", col.names = c("Teaching Method", "Proportion"), align = c("c", "c"))
+
+#Use bar graph to compare the number of classrooms for each teaching method
+ggplot(data = TestScoresLev2, mapping = aes(x = teaching_method)) + 
+  geom_bar(fill = "white", color = "black", width = 0.5) +
+  labs(x = "Teaching Method",
+       y = "Frequency",
+       title = "Number of Classroom For Each Teaching Method") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
+```
+
+## EDA - bivariate
+```{r}
+#Use boxplot to visualize the distribution of posttest scores for different lunch type
+ggplot(data = TestScores, mapping = aes(y = lunch, x = posttest)) +
+  geom_boxplot() +
+  labs(y = "Lunch Type",
+       x = "Posttest Scores",
+       title = "Boxplot of Posttest Score By Lunch Type") + 
+  scale_y_discrete(labels = c("Does not qualify", "Qualifies for reduced/\nfree lunch")) +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
+```
+
+```{r}
+# Lattice plot for Posttest Scores vs. Lunch Type
+ggplot(TestScores,aes(x = factor(lunch),y = posttest)) +  
+  geom_dotplot(binaxis = "y",stackdir = "center",binwidth = 25/30) + 
+  facet_wrap(~classroom,ncol = 7) + 
+  theme(strip.text.x = element_blank()) + coord_flip() +
+  labs(x = "Lunch Type",y = "Posttest Score") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 10, margin = margin(r = 10)),
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5)
+  )
+```
+
+```{r}
+#Use side-by-side boxplots to explore the relationship between the posttest score and the teaching method by treating the observations as independent
+posttest_TM <-
+  ggplot(data = TestScores, mapping = aes(x = posttest, y = teaching_method)) +
+  geom_boxplot() +
+  labs(x = "Posttest Scores",
+       y = "Teaching Method",
+       title = "Boxplot of Posttest Score By Teaching Method") + 
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
+```
+
+
+```{r, warning=F, message=F}
+#Create side-by-side boxplots to explore the relationship between the posttest score and the teaching method by finding the mean for each classroom type to aggregate the posttest score
+posttest_mean_TM <-
+  TestScores %>%
+  group_by(classroom) %>%
+  summarize(mean_posttest = mean(posttest, na.rm = T),
+            teaching_method = teaching_method) %>%
+  ggplot(mapping = aes(x = mean_posttest, y = teaching_method)) +
+  geom_boxplot() +
+  labs(x = "Mean Posttest Score",
+       y = "Teaching Method",
+       title = "Boxplot of Mean Posttest Score By Teaching Method \nFor Classrooms") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
+
+grid.arrange(posttest_TM, posttest_mean_TM, ncol = 1)
+```
+  
+## Modeling
+```{r}
+#Create encoding for each categorical variables. For level one variable lunch, 1=qualifies for reduced/free lunch, 0=does not qualify. For level two variable teaching_method, 1=standard, 0=experimental.
+TestScores <-
+  TestScores %>%
+  mutate(qualify = ifelse(lunch == "Qualifies for reduced/free lunch", 1, 0),
+         standard = ifelse(teaching_method == "Standard", 1, 0))
+```
+
+
+### Model with no covariates (random intercepts model)
+
+$\textbf{Multilevel Model:}$ Let $Y_{ij}$ be the posttest score of the $j^{th}$ student in the $i^{th}$ classroom
+
+$$\text{Level 1: } Y_{ij} = a_i + \epsilon_{ij}$$
+
+$$\text{Level 2: } a_i = \alpha_0 + u_i$$
+$\textbf{Composite Model:}$
+
+$$Y_{ij} = \alpha_0 + u_i + \epsilon_{ij}$$
+
+```{r}
+#Random Intercepts Model
+model1 <- lmer(posttest ~ 1 + (1 | classroom), REML = T, data = TestScores)
+summary(model1)
+```
+
+$\textbf{Model Parameters:}$
+
+Fixed effects:  
+$\hat\alpha_0 = 68.410$, which represents the average posttest score across all students and all classrooms is 68.41.
+
+Random effects:  
+$\hat\sigma^2_u = 183.35$. This is the $u_i$ variance. It represents the estimated variance of between classroom deviations.  
+$\hat\sigma^2 = 10.38$. This is the $\epsilon_{ij}$ variance that represents the estimated variance of within classroom deviations. 
+
+Intraclass correlation coefficient:
+$$\hat{p} = \frac{\hat\sigma^2_u}{\hat\sigma^2_u+\hat\sigma^2} = \frac{183.35}{193.73} = 0.946$$
+
+It tells us 94.6% of the total variation in posttest scores is due to differences between classrooms. We can also say that 0.946 is the average correlation for any pair of students within the same classroom. The high intraclass correlation coefficient suggests that the random effect classroom has an significant impact on the variability of posttest score. Students in the same classroom are much more likely to have similar posttest score compared to students from different classrooms.
+
+
+### Level One Models
+
+$\textbf{Multilevel Model:}$
+
+$$\text{Leve 1: } Y_{ij} = a_i + b_ix_\text{ij, qualify} + \epsilon_{ij}$$
+
+
+$$\begin{align}
+\text{Level 2: } &a_i = \alpha_0 + u_i \\
+&b_i = \beta_0 + v_i
+\end{align}$$
+
+$\textbf{Composite Model:}$
+
+$$Y_{ij} = \alpha_0 + \beta_0x_\text{ij, qualify} + u_i + v_ix_\text{ij, qualify} + \epsilon_{ij}$$
+
+```{r}
+#Random Intercept and Slopes Model Based on the Inclusion of Lunch
+model2 <- lmer(posttest ~  qualify + (1 + qualify | classroom), REML = FALSE, data = TestScores)
+summary(model2)
+```
+
+$\textbf{Model Parameters:}$
+
+Fixed effects:  
+$\hat\alpha_0 = 69.933$. It represents the average posttest score for students who does not qualify for the reduced/free lunch across all classroom.  
+$\hat\beta_0 = -3.389$, so we expect posttest scores to decrease by 3.389, on average, for students that qualify for free or subsidized lunches as compared to students that do not qualify.  
+
+Since the t-value $|-12.42| > 2$, whether a student qualify for reduced/free lunch or not have statistically significant effect on posttest score.
+
+Random effects:  
+$\hat\sigma^2_u = 150.242$. This is the $u_i$ variance. It represents the estimated variance of between classroom deviations.  
+$\hat\sigma^2_v = 1.372$. This is the $v_i$ variance. It represents the estimated variance of between classroom deviations with the impact of reduced/free lunch qualification.  
+$\hat\sigma^2 = 9.335$. This is the $\epsilon_{ij}$ variance that represents the estimated variance of posttest score within classroom after accounting for the effect of lunch type. 
+
+```{r}
+#reduced variance model
+model2reduced <- lmer(posttest ~  qualify + (1 | classroom), REML = FALSE, data = TestScores)
+summary(model2reduced)
+anova(model2reduced, model2, test = "Chisq")
+```
+
+
+
+### Level Two Models
+
+
+$\textbf{Multilevel Model:}$
+
+$$\text{Level 1: } Y_{ij} = a_i + b_ix_\text{ij, qualify} + \epsilon_{ij}$$
+$$\begin{align}
+\text{Level 2: } &a_i = \alpha_0 + \alpha_1x_\text{i, standard} + u_i \\
+&b_i = \beta_0 + v_i
+\end{align}$$
+
+$\textbf{Composite Model:}$
+
+$$Y_{ij} = \alpha_0 + \alpha_1x_\text{i, standard} + \beta_0x_\text{ij, qualify} + u_i + v_ix_\text{ij, qualify} + \epsilon_{ij}$$
+
+```{r}
+#Random Intercept Model with Lunch and Teaching Method
+model3 <- lmer(posttest ~ standard + qualify + (1 + qualify | classroom), REML = FALSE, data = TestScores)
+summary(model3)
+```
+
+$\textbf{Multilevel Model:}$
+
+$$\text{Level 1: } Y_{ij} = a_i + b_ix_\text{ij, qualify} + \epsilon_{ij}$$
+$$\begin{align}
+\text{Level 2: } &a_i = \alpha_0 + \alpha_1x_\text{i, standard} + u_i \\
+&b_i = \beta_0 + \beta_1x_\text{i, standard} + v_i
+\end{align}$$
+
+$\textbf{Composite Model:}$
+
+$$Y_{ij} = \alpha_0 + \alpha_1x_\text{i, standard} + u_i + \beta_0x_\text{ij, qualify} + \beta_1x_\text{i, standard}x_\text{ij, qualify} + v_ix_\text{ij, qualify} + \epsilon_{ij}$$
+
+```{r}
+#Random Intercept Model with Lunch, Teaching Method, and the Interaction
+model4 <- lmer(posttest ~ standard + qualify + standard:qualify + (1 + qualify | classroom), REML = FALSE, data = TestScores)
+summary(model4)
+```
+
+$\textbf{Model Parameters:}$
+
+Fixed effects:   
+$\hat\alpha_0 = 75.969$. It represents the average posttest score for students who does not qualify for the reduced/free lunch and in classroom with experimental teaching method.   
+$\hat\alpha_1 = -9.588$, classrooms with standard teaching method would have average posttest scores 9.588 points lower than those in classrooms using the experimental teaching method, with the lunch type hold constant.   
+$\hat\beta_0 = -3.042$. Students who qualify for reduced/free lunch would have the posttest scores 3.04 points lower than the students who does not qualify on average, assuming teaching method hold constant.  
+$\hat\beta_1 = -0.586$, the interaction term indicates for students in classrooms with the standard teaching method and qualify for reduced/free lunch would have the posttest score 0.586 points lower than the students in classrooms with experimental teaching method.  
+Since the absolute t-value for standard (-4.001) and qualify (q-7.170) are both greater than 2, that suggests the two predictors have the statisticall significant effect on posttest score. But the t-value of the interaction term would be $|-1.060|$, which is less than 2, so that means there is insufficient evidence to conclude the interaction between lunch type and teaching method would be meaningfully affecting the posttest score.  
+
+Random effects:  
+$\hat\sigma^2_u = 128.708$. This is the $u_i$ variance. It represents the estimated variance of between classroom deviations.  
+$\hat\sigma^2_v = 1.318$. This is the $v_i$ variance. It represents the estimated variance of between classroom deviations with the impact of reduced/free lunch qualification on posttest scores.  
+$\hat\sigma^2 = 9.333$. This is the $\epsilon_{ij}$ variance that represents the estimated variance of posttest score within classroom after accounting for the effect of lunch type, teaching method, and the interaction between them.  
+
+```{r}
+#reduced variance model
+model4reduced <- lmer(posttest ~ standard + qualify + standard:qualify + (1 | classroom), REML = FALSE, data = TestScores)
+summary(model4reduced)
+anova(model4reduced, model4, test = "Chisq")
+```
+
+
+```{r}
+anova(model3, model4, test = "Chisq")
+```
+  
+1) Hypotheses
+$H_0: \beta_1 = 0 \\
+ H_a: \beta_1 \ne 0$  
+2) Test statistics: $1.117$
+3) Distribution of the test statistics under the null: $X^2_1$
+4) p-value: $0.29$
+5) Conclusion: Since the p-value is 0.29, we can not reject the null hypothesis with a significant level of 0.05. Comparing the AIC and BIC of those two models, we see that both the AIC and BIC of the reduced model are lower than the model with interaction, which also supports the conclusion. That means the interaction term is not statistically significant to the post-test score. The model without the interaction term would be preferred.
+
