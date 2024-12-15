@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #Add libraries if needed
 library(tidyverse)
 library(ggplot2)
+library(kableExtra)
 
 #Read in dataset
 NYCAccidents <- read.csv(file = "/Users/hocaroline/Downloads/NYC Accidents 2020.csv")
@@ -66,10 +67,32 @@ NYCAccidents <-
   filter(NUM.CARS.INVOLVED > 0) %>%
   na.omit() # Remove accidents missing BOROUGH
 
+NYCAccidents <- NYCAccidents %>%
+  mutate(LOG.NUM.CARS = log(NUM.CARS.INVOLVED)) #
+
 head(NYCAccidents)
 ```
 
+
 ```{r}
+# Create the table of persons affected
+persons_count <- table(NYCAccidents$PERSONS.AFFECTED)
+
+# Convert the table into a data frame with row names and transpose it
+horizontal_table <- t(data.frame(PersonsAffected = names(persons_count), Count = as.numeric(persons_count)))
+rownames(horizontal_table) <- c("Persons Affected", "Count")
+
+# Render the transposed table using kable
+kable(horizontal_table, format = "markdown", row.names = TRUE, align = c("c"))
+```
+
+```{r}
+# Distribution of persons affected
+ggplot(data = NYCAccidents, mapping = aes(x = PERSONS.AFFECTED)) +
+  geom_histogram(binwidth = 1) + theme_minimal() +
+  labs(x = "Number of Persons Affected",
+       y = "Count of Accidents") 
+
 # Bar plot for accidents by borough
 ggplot(NYCAccidents, aes(x = BOROUGH)) +
   geom_bar() + theme_minimal() +
@@ -112,9 +135,19 @@ kable(table1, booktabs=T,
 ```{r}
 ## Checking linearity assumption: Empirical log of the means plot
 sumStats <- NYCAccidents %>% group_by(NUM.CARS.INVOLVED) %>% 
-  summarise(mnNum = mean(PERSONS.AFFECTED),
-            logmnNum = log(mnNum), n=n())
-ggplot(sumStats, aes(x=NUM.CARS.INVOLVED, y=logmnNum)) +
+  summarise(mnPersons = mean(PERSONS.AFFECTED),
+            logmnPersons = log(mnPersons), n=n())
+ggplot(sumStats, aes(x=NUM.CARS.INVOLVED, y=logmnPersons)) +
+  geom_point()+
+  geom_smooth(method = "loess")+ theme_minimal() +
+  xlab("Number of cars involved") +
+  ylab("Log empirical mean persons affected") 
+
+## Rechecking linearity assumption after transformation
+sumStats <- NYCAccidents %>% group_by(LOG.NUM.CARS) %>% 
+  summarise(mnPersons = mean(PERSONS.AFFECTED),
+            logmnPersons = log(mnPersons), n=n())
+ggplot(sumStats, aes(x=LOG.NUM.CARS, y=logmnPersons)) +
   geom_point()+
   geom_smooth(method = "loess")+ theme_minimal() +
   xlab("Number of cars involved") +
@@ -122,13 +155,13 @@ ggplot(sumStats, aes(x=NUM.CARS.INVOLVED, y=logmnNum)) +
 ```
 
 ```{r}
-model1 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED, family = poisson, data = NYCAccidents)
+model1 = glm(PERSONS.AFFECTED ~ LOG.NUM.CARS, family = poisson, data = NYCAccidents)
 
-model2 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH, family = poisson, data = NYCAccidents)
+model2 = glm(PERSONS.AFFECTED ~ LOG.NUM.CARS + BOROUGH, family = poisson, data = NYCAccidents)
 
-model3 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + TIME.OF.DAY, family = poisson, data = NYCAccidents)
+model3 = glm(PERSONS.AFFECTED ~ LOG.NUM.CARS + TIME.OF.DAY, family = poisson, data = NYCAccidents)
 
-model4 = glm(PERSONS.AFFECTED ~ NUM.CARS.INVOLVED + BOROUGH + TIME.OF.DAY, family = poisson, data = NYCAccidents)
+model4 = glm(PERSONS.AFFECTED ~ LOG.NUM.CARS + BOROUGH + TIME.OF.DAY, family = poisson, data = NYCAccidents)
 ```
 
 ```{r}
@@ -140,20 +173,79 @@ anova(model3, model4, test = "Chisq")
 ```
 
 ```{r}
+# Find Test Statistic
+X2 <- sum(residuals(model4, type = "pearson")^2)
+X2
+
+# Find degrees of freedom
+model4$df.residual
+
+# Find p-value
+1 - pchisq(X2, model4$df.residual)
+```
+
+
+```{r}
+phiHat <- X2/model4$df.residual
+phiHat
+```
+
+$$\hat\phi = \frac{\chi^2}{n-p} = \frac{65754.46}{48897} = 1.344755$$
+
+```{r}
+model4q = glm(PERSONS.AFFECTED ~ LOG.NUM.CARS + BOROUGH + TIME.OF.DAY, family = quasipoisson, data = NYCAccidents)
+summary(model4q)
+```
+
+```{r}
+#Find Test Statistic
+X2 <- sum(residuals(model4q, type = "pearson")^2)
+X2
+
+#Find DF, df = n - p
+model4q$df.residual
+
+#Find p-value
+1 - pchisq(X2, model4q$df.residual)
+```
+
+```{r}
+NYCAccidentsf <- NYCAccidents %>%
+  filter(PERSONS.AFFECTED <= 5) #
+```
+
+```{r}
+model4f = glm(PERSONS.AFFECTED ~ LOG.NUM.CARS + BOROUGH + TIME.OF.DAY, family = poisson, data = NYCAccidentsf)
+summary(model4f)
+```
+
+```{r}
+#Find Test Statistic
+X2 <- sum(residuals(model4f, type = "pearson")^2)
+X2
+
+#Find DF, df = n - p
+model4f$df.residual
+
+#Find p-value
+1 - pchisq(X2, model4f$df.residual)
+```
+
+```{r}
 summary(model4)
 ```
 
 $$\begin{align}
-\log(\lambda) = &\beta_0 + \beta_1 (\text{NUM.CARS.INVOLVED}) + \beta_2 (\text{BOROUGHBROOKLYN}) + \\ 
+\log(\lambda) = &\beta_0 + \beta_1 (\text{LOG.NUM.CARS}) + \beta_2 (\text{BOROUGHBROOKLYN}) + \\ 
 &\beta_3 (\text{BOROUGHMANHATTAN}) + \beta_4 (\text{BOROUGHQUEENS}) + \\
 &\beta_5 (\text{BOROUGHSTATEN.ISLAND}) + \beta_6 (\text{TIME.OF.DAYAfternoon}) + \\
 &\beta_7 (\text{TIME.OF.DAYEvening}) + \beta_8 (\text{TIME.OF.DAYNight})
 \end{align}$$
 
 $$\begin{align}
-\log(\lambda) = &-1.51694 + 0.12363 \cdot (\text{NUM.CARS.INVOLVED}) + 0.03124 \cdot (\text{BOROUGHBROOKLYN})  \\
-&- 0.14917 \cdot (\text{BOROUGHMANHATTAN}) - 0.04798 \cdot (\text{BOROUGHQUEENS})  \\
-&+ 0.21441 \cdot (\text{BOROUGHSTATEN.ISLAND}) + 0.13234 \cdot (\text{TIME.OF.DAYAfternoon})  \\
-&+ 0.36802 \cdot (\text{TIME.OF.DAYEvening}) + 0.37914 \cdot (\text{TIME.OF.DAYNight})
+\log(\lambda) = &-1.52703 + 0.23423 \cdot (\text{LOG.NUM.CARS}) + 0.03339 \cdot (\text{BOROUGHBROOKLYN})  \\
+&- 0.15132 \cdot (\text{BOROUGHMANHATTAN}) - 0.04576 \cdot (\text{BOROUGHQUEENS})  \\
+&+ 0.21325 \cdot (\text{BOROUGHSTATEN.ISLAND}) + 0.13197 \cdot (\text{TIME.OF.DAYAfternoon})  \\
+&+ 0.36772 \cdot (\text{TIME.OF.DAYEvening}) + 0.38687 \cdot (\text{TIME.OF.DAYNight})
 \end{align}$$
 
