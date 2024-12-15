@@ -31,47 +31,72 @@ head(TestScores)
 ```
 
 ```{r}
-#Find mean and standard deviation
-TestScores %>%
+#Find mean and standard deviation of the posttest scores 
+Posttest_Score <- TestScores %>%
   summarize(overallmean = mean(posttest, na.rm = TRUE),
             overallsd = sd(posttest, na.rm = TRUE))
+kable(Posttest_Score, format = "markdown", col.names = c("Overall Mean", "Overall Standard Deviation"), align = c("c", "c"))
 
+# Histogram that describes the distribution of posttest scores for individual student
 posttest_all <- ggplot(data = TestScores, mapping = aes(x = posttest)) +
   geom_histogram(binwidth = 2, fill = "white", color = "black") +
-  labs(x = "Posttest Scores",
-       y = "Number of Students") 
-posttest_all
+  labs(title = "Distribution of Post-test Scores for Individual Students", 
+       x = "Post-test Scores",
+       y = "Number of Students") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5))
 ```
 
 ```{r}
-#Find the mean and standard deviation for each id and pass the means to ggplot
+#Find the mean and standard deviation for each type of classroom and form a histogram that represent the distribution of the mean posttest scores for different types of classrooms
 posttest_agg <- TestScores %>%
   group_by(classroom) %>%
   summarize(mean_score = mean(posttest, na.rm = TRUE),
             sd_score = sd(posttest, na.rm = TRUE)) %>%
   ggplot(mapping = aes(x = mean_score)) +
      geom_histogram(binwidth = 2, fill = "white", color = "black") +
-     labs(x = "Mean Posttest Score",
-          y = "Number of Classrooms") 
-posttest_agg
+     labs(title = "Distribution of Mean Posttest Scores for Classrooms", 
+          x = "Mean Posttest Scores",
+          y = "Number of Classrooms") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5))
 ```
 
 ```{r}
-grid.arrange(posttest_all,posttest_agg,ncol=1)
+grid.arrange(posttest_all, posttest_agg, ncol = 1)
 ```
 
+### Level one categorical variable (Lunch)
 ```{r}
-# Find the counts of each lunch type
-table(TestScores$lunch)
-#Find the proportion for each lunch type
-prop.table(table(TestScores$lunch))
+# Find the counts of students for each lunch type
+lunch_count <- table(TestScores$lunch)
+kable(lunch_count, format = "markdown", col.names = c("Lunch Type", "Count"), align = c("c", "c"))
 
+#Find the proportion of students for each lunch type
+lunch_prop <- prop.table(table(TestScores$lunch))
+kable(lunch_prop, format = "markdown", col.names = c("Lunch Type", "Proportion"), align = c("c", "c"))
+
+#Use bar graph to compare the number of students who does or does not qualify for reduced/free lunch 
 ggplot(data = TestScores, mapping = aes(x = lunch)) + 
-  geom_bar(fill = "white", color = "black") +
+  geom_bar(fill = "white", color = "black", width = 0.5) +
   labs(x = "Lunch Type",
-       y = "Frequency")
+       y = "Frequency",
+       title = "Number of Students for Each Lunch Type") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5),
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
 ```
 
+### Level two categorical variable (Teaching Method)
 ```{r}
 #Since the level 2 variables take the same value for each row of each classroom, keep the first row associated with each classroom
 TestScoresLev2 <- 
@@ -79,42 +104,85 @@ TestScoresLev2 <-
   group_by(classroom) %>%
   filter(row_number() == 1) 
 
-table(TestScoresLev2$teaching_method)
-prop.table(table(TestScoresLev2$teaching_method))
+#Find the count of classroom for each teaching method
+TM_count <- table(TestScoresLev2$teaching_method)
+kable(TM_count, format = "markdown", col.names = c("Teaching Method", "Count"), align = c("c", "c"))
 
+#Find the proportion of classroom for each teaching method
+TM_prop <- prop.table(table(TestScoresLev2$teaching_method))
+kable(TM_prop, format = "markdown", col.names = c("Teaching Method", "Proportion"), align = c("c", "c"))
+
+#Use bar graph to compare the number of classrooms for each teaching method
 ggplot(data = TestScoresLev2, mapping = aes(x = teaching_method)) + 
-  geom_bar(fill = "white", color = "black") +
+  geom_bar(fill = "white", color = "black", width = 0.5) +
   labs(x = "Teaching Method",
-       y = "Frequency")
+       y = "Frequency",
+       title = "Number of Classroom For Each Teaching Method") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
 ```
 
+
+## EDA - bivariate
 ```{r}
+#Use boxplot to visualize the distribution of posttest scores for different lunch type
 ggplot(data = TestScores, mapping = aes(y = lunch, x = posttest)) +
   geom_boxplot() +
   labs(y = "Lunch Type",
-       x = "Posttest Scores")
+       x = "Posttest Scores",
+       title = "Boxplot of Posttest Score By Lunch Type") + 
+  scale_y_discrete(labels = c("Does not qualify", "Qualifies for reduced/\nfree lunch")) +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
 ```
 
 ```{r}
 # Lattice plot for Posttest Scores vs. Lunch Type
-ggplot(TestScores,aes(x=factor(lunch),y=posttest)) +  
-  geom_dotplot(binaxis="y",stackdir="center",binwidth=25/30) + 
-  facet_wrap(~classroom,ncol=10) +   
-  theme(strip.text.x=element_blank()) + coord_flip() +
-  labs(x="Lunch Type",y="Posttest Score")
+ggplot(TestScores,aes(x = factor(lunch),y = posttest)) +  
+  geom_dotplot(binaxis = "y",stackdir = "center",binwidth = 25/30) + 
+  facet_wrap(~classroom,ncol = 7) + 
+  theme(strip.text.x = element_blank()) + coord_flip() +
+  labs(x = "Lunch Type",y = "Posttest Score") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 10, margin = margin(r = 10)),
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5)
+  )
 ```
 
 ```{r}
+#Use side-by-side boxplots to explore the relationship between the posttest score and the teaching method by treating the observations as independent
 posttest_TM <-
   ggplot(data = TestScores, mapping = aes(x = posttest, y = teaching_method)) +
   geom_boxplot() +
   labs(x = "Posttest Scores",
-       y = "Teaching Method") 
-posttest_TM
+       y = "Teaching Method",
+       title = "Boxplot of Posttest Score By Teaching Method") + 
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
 ```
 
 
-```{r}
+```{r, warning=F, message=F}
+#Create side-by-side boxplots to explore the relationship between the posttest score and the teaching method by finding the mean for each classroom type to aggregate the posttest score
 posttest_mean_TM <-
   TestScores %>%
   group_by(classroom) %>%
@@ -123,30 +191,41 @@ posttest_mean_TM <-
   ggplot(mapping = aes(x = mean_posttest, y = teaching_method)) +
   geom_boxplot() +
   labs(x = "Mean Posttest Score",
-       y = "Teaching Method") 
+       y = "Teaching Method",
+       title = "Boxplot of Mean Posttest Score By Teaching Method \nFor Classrooms") +
+  theme(
+    plot.title = element_text(size = 15L,
+    face = "italic",
+    hjust = 0.5), 
+    axis.text.y = element_text(size = 11L),
+    axis.text.x = element_text(size = 11L),
+    axis.title.y = element_text(size = 13L),
+    axis.title.x = element_text(size = 13L))
 
 grid.arrange(posttest_TM, posttest_mean_TM, ncol = 1)
 ```
 
+## Modeling
 ```{r}
+#Create encoding for each categorical variables. For level one variable lunch, 1=qualifies for reduced/free lunch, 0=does not qualify. For level two variable teaching_method, 1=standard, 0=experimental.
 TestScores <-
   TestScores %>%
-  mutate(free = ifelse(lunch=="Qualifies for reduced/free lunch",1,0),
-         standard = ifelse(teaching_method=="Standard",1,0))
+  mutate(qualify = ifelse(lunch == "Qualifies for reduced/free lunch", 1, 0),
+         standard = ifelse(teaching_method == "Standard", 1, 0))
 ```
 
 
 ### Model with no covariates (random intercepts model)
 
-multilevel model
+$\textbf{Multilevel Model:}$ 
 
-$$\text{LV1: } y_{ij} = a_i + \epsilon_{ij}$$
+$$\text{Level 1: } Y_{ij} = a_i + \epsilon_{ij} \text{ where } \epsilon_{ij} \sim N(0, \sigma^2) $$
 
-$$\text{LV2: } a_i = \alpha_0 + u_i$$
+$$\text{Level 2: } a_i = \alpha_0 + u_i \text{ where } u_{i} \sim N(0, \sigma_u^2)$$
 
-composite model
+$\textbf{Composite Model:}$
 
-$$y_{ij} = \alpha_0 + u_i + \epsilon_{ij}$$
+$$Y_{ij} = \alpha_0 + u_i + \epsilon_{ij}$$
 
 ```{r}
 model1 <- lmer(posttest ~ 1 + (1 | classroom), REML = FALSE, data = TestScores)
@@ -167,21 +246,39 @@ $$\hat{p} = \frac{\hat\sigma^2_u}{\hat\sigma^2_u+\hat\sigma^2} = \frac{183.35}{1
 
 ### Level One Model
 
-multilevel model
-
-$$\text{LV1: } y_{ij} = a_i + b_ix_{ij,free} + \epsilon_{ij}$$
+$\textbf{Multilevel Model:}$
 
 $$\begin{align}
-\text{LV2: } &a_i = \alpha_0 + u_i \\
-&b_i = \beta_0 + v_i
+&\text{Level 1: } Y_{ij} = a_i + b_i x_{ij,\text{qualify}} + \epsilon_{ij}, \quad \text{where } \epsilon_{ij} \sim N(0, \sigma^2) \\
+&\begin{aligned} \text{Level 2: }
+a_i &= \alpha_0 + u_i \\
+b_i &= \beta_0 + v_i
+\end{aligned} \\
+&\text{where } 
+\begin{bmatrix}
+u_i \\
+v_i
+\end{bmatrix}
+\sim N\left(
+\begin{bmatrix}
+0 \\
+0
+\end{bmatrix}, 
+\begin{bmatrix}
+\sigma_u^2 & \sigma_{uv} = \rho_{uv} \sigma_u \sigma_v \\
+\sigma_{uv} = \rho_{uv} \sigma_u \sigma_v & \sigma_v^2
+\end{bmatrix}
+\right)
 \end{align}$$
 
-composite model
+$\textbf{Composite Model:}$
 
-$$y_{ij} = \alpha_0 + u_i + \beta_0x_{ij,free} + v_ix_{ij,free} + \epsilon_{ij}$$
+$$Y_{ij} = \alpha_0 + u_i + \beta_0x_{ij,qualify} + v_ix_{ij,qualify} + \epsilon_{ij}$$
+
+
 
 ```{r}
-model2 <- lmer(posttest ~  free + (1 + free | classroom), REML = FALSE, data = TestScores)
+model2 <- lmer(posttest ~  qualify + (1 + qualify | classroom), REML = FALSE, data = TestScores)
 summary(model2)
 ```
 
@@ -189,28 +286,82 @@ $|t| > 2$
 
 We expect posttest scores to decrease by 3.39, on average, for students that qualify for free or subsidized lunches as compared to students that do not qualify. 
 
-### Level Two Model
+### Level Two Models
 
-multilevel model 
-
-$$\text{LV1: } y_{ij} = a_i + b_ix_{ij,free} + \epsilon_{ij}$$
+$\textbf{Multilevel Model:}$
 
 $$\begin{align}
-\text{LV2: } &a_i = \alpha_0 + \alpha_1x_{i,standard} + u_i \\
-&b_i = \beta_0 + \beta_1x_{i,standard} + v_i
+&\text{Level 1: } Y_{ij} = a_i + b_ix_\text{ij, qualify} + \epsilon_{ij}, \quad \text{where } \epsilon_{ij} \sim N(0, \sigma^2) \\
+&\begin{aligned} \text{Level 2: }
+a_i &= \alpha_0 + \alpha_1x_\text{i, standard} + u_i  \\
+b_i &= \beta_0 + v_i
+\end{aligned} \\
+&\text{where } 
+\begin{bmatrix}
+u_i \\
+v_i
+\end{bmatrix}
+\sim N\left(
+\begin{bmatrix}
+0 \\
+0
+\end{bmatrix}, 
+\begin{bmatrix}
+\sigma_u^2 & \sigma_{uv} = \rho_{uv} \sigma_u \sigma_v \\
+\sigma_{uv} = \rho_{uv} \sigma_u \sigma_v & \sigma_v^2
+\end{bmatrix}
+\right)
 \end{align}$$
 
-composite model
+$\textbf{Composite Model:}$
 
-$$y_{ij} = \alpha_0 + \alpha_1x_{i,standard} + u_i + \beta_0x_{ij,free} + \beta_1x_{i,standard}x_{ij,free} + v_ix_{ij,free} + \epsilon_{ij}$$
+$$Y_{ij} = \alpha_0 + \alpha_1x_\text{i, standard} + \beta_0x_\text{ij, qualify} + u_i + v_ix_\text{ij, qualify} + \epsilon_{ij}$$
 
 ```{r}
-model3 <- lmer(posttest ~  free + standard + free:standard + (1 + free | classroom), REML = FALSE, data = TestScores)
+#Random Intercept Model with Lunch and Teaching Method
+model3 <- lmer(posttest ~ standard + qualify + (1 + qualify | classroom), REML = FALSE, data = TestScores)
 summary(model3)
+```
+
+
+$\textbf{Multilevel Model:}$
+
+$$\begin{align}
+&\text{Level 1: } Y_{ij} = a_i + b_ix_{ij,qualify} + \epsilon_{ij}, \quad \text{where } \epsilon_{ij} \sim N(0, \sigma^2) \\
+&\begin{aligned} \text{Level 2: }
+a_i &= \alpha_0 + \alpha_1x_{i,standard} + u_i \\
+b_i &= \beta_0 + \beta_1x_{i,standard} + v_i
+\end{aligned} \\
+&\text{where } 
+\begin{bmatrix}
+u_i \\
+v_i
+\end{bmatrix}
+\sim N\left(
+\begin{bmatrix}
+0 \\
+0
+\end{bmatrix}, 
+\begin{bmatrix}
+\sigma_u^2 & \sigma_{uv} = \rho_{uv} \sigma_u \sigma_v \\
+\sigma_{uv} = \rho_{uv} \sigma_u \sigma_v & \sigma_v^2
+\end{bmatrix}
+\right)
+\end{align}$$
+
+$\textbf{Composite Model:}$
+
+$$Y_{ij} = \alpha_0 + \alpha_1x_{i,standard} + u_i + \beta_0x_{ij,qualify} + \beta_1x_{i,standard}x_{ij,qualify} + v_ix_{ij,qualify} + \epsilon_{ij}$$
+
+```{r}
+model4 <- lmer(posttest ~  qualify + standard + qualify:standard + (1 + qualify | classroom), REML = FALSE, data = TestScores)
+summary(model4)
 ```
 
 ```{r}
 anova(model1, model2, test = "Chisq")
 anova(model1, model3, test = "Chisq")
+anova(model1, model4, test = "Chisq")
 anova(model2, model3, test = "Chisq")
+anova(model3, model4, text = "Chisq")
 ```
